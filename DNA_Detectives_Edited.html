@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DNA Detectives</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Night-shift lab console. Dark single theme (navy surfaces, one cyan accent, amber for DNA differences).
+   Fully offline: system fonts only, no external files. */
+:root {
+  --bg: #0c1722; --bg2: #101f2e; --panel: #14273a; --line: #2a4660;
+  --fg: #eef3f6; --mute: #a9bccb; --accent: #35c6d9; --accent-ink: #062a31;
+  --amber: #f3b63f; --amber-ink: #2a1d00; --good: #62d89a; --good-bg: #123a2b; --bad: #f58a82; --bad-bg: #402022; --warn-bg: #3b3115;
+  --display: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; background: var(--bg);
+  background-image: radial-gradient(circle at 1px 1px, rgba(53,198,217,.10) 1px, transparent 0); background-size: 26px 26px;
+  color: var(--fg); font-family: var(--body); font-size: 17px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 36px;
+}
+#app { max-width: 1120px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+p { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.mute { color: var(--mute); }
+.eyebrow { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px 18px; flex-wrap: wrap; margin-bottom: 10px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.brand b { font-family: var(--display); font-size: 22px; }
+.brand span { font-size: 14px; color: var(--mute); }
+.hud { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--bg2); padding: 4px 10px; border-radius: 6px; font-family: var(--mono); font-size: 14px; white-space: nowrap; }
+.clock-icon { width: 16px; height: 16px; display: inline-block; flex: 0 0 16px; vertical-align: -3px; color: var(--accent); }
+.chip.big { color: var(--accent); border-color: var(--accent); }
+.link { background: none; border: 0; color: var(--mute); text-decoration: underline; padding: 6px; font-size: 14px; }
+.sim { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--amber); color: var(--amber); font-weight: 700; white-space: nowrap; }
+
+.rail { position: relative; margin: 34px 0 18px; padding: 0 6px; }
+.rail-line { position: absolute; left: 28px; right: 28px; top: 21px; height: 4px; background: var(--line); border-radius: 2px; }
+.rail-fill { position: absolute; left: 28px; top: 21px; height: 4px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 12px var(--accent); transition: width .5s ease; }
+.rail-nodes { position: relative; display: flex; justify-content: space-between; }
+.rn { width: 96px; text-align: center; font-size: 13px; color: var(--mute); line-height: 1.25; }
+.rn i { display: grid; place-items: center; width: 28px; height: 28px; margin: 7px auto 6px; border-radius: 50%; background: var(--bg); border: 2px solid var(--line); font-style: normal; font-family: var(--mono); font-size: 13px; position: relative; z-index: 1; }
+.rn.on i { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 14px rgba(53,198,217,.6); }
+.rn.done i { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.rn.on { color: var(--fg); font-weight: 600; }
+.cart { position: absolute; top: -2px; width: 34px; height: 18px; background: var(--amber); border-radius: 3px; transform: translateX(-50%); transition: left .5s ease; z-index: 2; box-shadow: 0 0 10px rgba(243,182,63,.5); }
+.cart::before, .cart::after { content: ""; position: absolute; bottom: -5px; width: 8px; height: 8px; background: var(--bg); border: 2px solid var(--amber); border-radius: 50%; }
+.cart::before { left: 4px; } .cart::after { right: 4px; }
+.cart-lbl { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 10px; letter-spacing: .1em; color: var(--amber); white-space: nowrap; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .stage { grid-template-columns: minmax(0, 1fr); } .rn { width: 56px; font-size: 11px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.card.flat { background: var(--bg2); }
+.board { display: grid; gap: 14px; }
+.board h2 { font-size: 26px; line-height: 1.2; }
+.side { display: grid; gap: 12px; }
+.task { display: flex; gap: 12px; align-items: flex-start; background: rgba(53,198,217,.14); border: 1.5px solid var(--accent); border-radius: 10px; padding: 12px 14px; font-size: 18px; }
+.task .ico { font-size: 20px; color: var(--accent); line-height: 1.3; }
+.task b { display: block; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.hintbtn { display: block; padding: 4px 0 0; color: var(--accent); font-size: 15px; }
+.hintline { margin-top: 6px; font-size: 16px; color: var(--fg); } .hintline b { color: var(--amber); display: inline; font-size: inherit; letter-spacing: 0; text-transform: none; }
+.info { display: block; padding: 2px 0; font-size: 15px; color: var(--mute); }
+.info .ico { display: none; }
+
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 12px 20px; font-weight: 700; font-size: 17px; transition: box-shadow .2s, transform .1s; }
+.btn:hover { box-shadow: 0 0 18px rgba(53,198,217,.45); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { background: var(--line); color: var(--mute); cursor: not-allowed; box-shadow: none; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1.5px solid var(--line); }
+.btn.ghost:hover { border-color: var(--accent); box-shadow: none; }
+.btn.small { padding: 8px 14px; font-size: 15px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.opts { display: grid; gap: 10px; }
+.opt { text-align: left; width: 100%; background: var(--bg2); border: 2px solid var(--line); border-radius: 10px; padding: 13px 16px; display: block; }
+.opt:hover:not(:disabled) { border-color: var(--accent); background: rgba(53,198,217,.08); }
+.opt:disabled { cursor: default; }
+.opt .t { font-weight: 700; }
+.opt .d { font-size: 14px; color: var(--mute); margin-top: 2px; }
+.opt.ok { border-color: var(--good); background: var(--good-bg); }
+.opt.no { border-color: var(--bad); background: var(--bad-bg); }
+.opt.dim { opacity: .55; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tri { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 620px) { .pair, .tri { grid-template-columns: minmax(0, 1fr); } }
+.letters { display: flex; gap: 8px; flex-wrap: wrap; }
+.letter { width: 58px; height: 58px; border-radius: 10px; border: 2px solid var(--line); background: var(--bg2); font-family: var(--mono); font-size: 26px; font-weight: 700; }
+.letter:hover:not(:disabled) { border-color: var(--accent); }
+.letter.ok { border-color: var(--good); background: var(--good-bg); }
+.letter.no { border-color: var(--bad); background: var(--bad-bg); }
+.letter:disabled { cursor: default; }
+.letter:disabled:not(.ok):not(.no) { opacity: .5; }
+.lbl { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); display: block; margin-bottom: 6px; font-weight: 700; }
+
+.fb { display: grid; gap: 8px; }
+.fb .l { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 10px; font-size: 16px; border: 1.5px solid; }
+.fb .l.ok { background: var(--good-bg); border-color: var(--good); }
+.fb .l.no { background: var(--bad-bg); border-color: var(--bad); }
+.fb .ic { font-weight: 800; font-size: 18px; line-height: 1.3; }
+.fb .l.ok .ic { color: var(--good); } .fb .l.no .ic { color: var(--bad); }
+.fb .pt { margin-left: auto; font-family: var(--mono); font-size: 13px; white-space: nowrap; color: var(--mute); padding-top: 3px; }
+
+.qc { background: #0a131c; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.qc .hd { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.qc .ln { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--line); font-size: 17px; flex-wrap: wrap; }
+.qc .v { font-family: var(--mono); font-size: 15px; display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.badge { padding: 2px 9px; border-radius: 5px; font-size: 13px; font-weight: 700; }
+.badge.ok { background: var(--good-bg); color: var(--good); border: 1px solid var(--good); }
+.badge.w { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad); }
+.rule { margin-top: 8px; font-size: 15px; color: var(--amber); border-top: 1px dashed var(--line); padding-top: 10px; }
+
+.align { --cw: 21px; overflow-x: auto; padding-bottom: 8px; }
+@media (max-width: 860px) { .align { --cw: clamp(17px, calc((100vw - 90px) / 33), 26px); } }
+.agrid { width: calc(var(--cw) * var(--cols)); position: relative; }
+.arow { height: calc(var(--cw) + 4px); position: relative; }
+.rowlbl { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 10px 0 4px; font-weight: 700; }
+.cell { position: absolute; top: 0; width: var(--cw); height: var(--cw); display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: calc(var(--cw) * .56); border: 1.5px solid var(--line); background: var(--bg2); }
+.cell.ref { background: rgba(53,198,217,.16); border-color: rgba(53,198,217,.5); }
+.cell.sm { background: #e9eff3; color: #0c1722; border-color: #fff; }
+.cell.diff { background: var(--amber); color: var(--amber-ink); border: 3px solid #fff; z-index: 2; }
+.strip { position: absolute; top: 0; left: 0; width: calc(var(--cw) * var(--len)); height: calc(var(--cw) + 4px); cursor: grab; touch-action: none; transition: transform .35s ease; border-radius: 4px; }
+.strip.drag { transition: none; cursor: grabbing; }
+.nums .n { position: absolute; width: var(--cw); text-align: center; font-size: 10px; color: var(--mute); font-family: var(--mono); }
+.nums .n.hot { color: var(--amber); font-weight: 800; font-size: 12px; }
+.mk { position: absolute; width: var(--cw); text-align: center; font-family: var(--mono); font-weight: 800; font-size: calc(var(--cw) * .6); height: var(--cw); line-height: var(--cw); color: var(--mute); }
+.mk.x { color: var(--amber); }
+.status { font-size: 15px; padding: 5px 12px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--line); }
+.status.good { color: var(--good); border-color: var(--good); }
+.slide-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mini-note { font-size: 14px; color: var(--mute); }
+
+.seq { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 8px; }
+.sq { width: 24px; text-align: center; font-family: var(--mono); }
+.sq b { display: grid; place-items: center; height: 28px; border: 1px solid var(--line); background: var(--bg2); font-size: 14px; }
+.sq.hl b { background: var(--amber); color: var(--amber-ink); border: 2px solid #fff; }
+.sq.n b { color: var(--bad); border-color: var(--bad); }
+.sq .qw { height: 30px; display: flex; align-items: flex-end; justify-content: center; margin-top: 4px; }
+.sq .qb { display: block; width: 10px; border-radius: 2px; background: var(--good); }
+.sq.low .qb { background: var(--bad); }
+.sq .pn { font-size: 9px; color: var(--mute); margin-top: 3px; }
+.cartcard { border: 1px solid var(--accent); background: var(--bg2); }
+.cartcard p { font-size: 14px; color: var(--mute); margin-top: 8px; }
+.who { font-size: 13px; color: var(--accent); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; font-weight: 700; }
+
+.ours { background: var(--warn-bg); border: 1.5px solid var(--amber); border-radius: 10px; padding: 10px 14px; font-family: var(--mono); font-size: 17px; }
+.lib { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+.lib .hd { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.entry { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-family: var(--mono); font-size: 16px; }
+.entry .tag { font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--amber); }
+.entry.hit { border-color: var(--amber); }
+.dots { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--mute); }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); display: inline-block; font-style: normal; }
+.dots i.on { background: var(--accent); } .dots i.dn { background: var(--good); } .dots i.bd { background: var(--bad); }
+.clue { background: var(--bg2); border: 2px solid var(--accent); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; }
+.clue .hd { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; letter-spacing: .1em; font-family: var(--mono); color: var(--accent); }
+.clue .tx { font-size: 20px; font-family: var(--display); line-height: 1.3; }
+.clue .tells { font-size: 15px; color: var(--mute); border-top: 1px dashed var(--line); padding-top: 8px; }
+.clue .tells b { color: var(--fg); }
+.legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 620px) { .legend { grid-template-columns: minmax(0, 1fr); } }
+.legend div { padding: 7px 9px; border-radius: 8px; font-size: 13px; border: 1px solid var(--line); background: var(--bg2); }
+.legend b { display: block; }
+
+.sheet { background: #e9eff3; color: #0c1722; border-radius: 10px; padding: 16px; font-size: 15px; }
+.sheet .hd { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.sheet h3 { font-size: 18px; }
+.sheet .ln { display: grid; grid-template-columns: 128px 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid #b9c8d3; }
+.sheet .ln b { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #36526a; padding-top: 2px; }
+@media (max-width: 520px) { .sheet .ln { grid-template-columns: 1fr; gap: 2px; } }
+.reply { border-radius: 10px; padding: 14px 16px; border: 1.5px solid; }
+.reply.best { background: var(--good-bg); border-color: var(--good); }
+.reply.over { background: var(--bad-bg); border-color: var(--bad); }
+.reply.under { background: var(--warn-bg); border-color: var(--amber); }
+.reply q { font-size: 18px; font-family: var(--display); display: block; quotes: none; }
+details.learn summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+details.learn p { margin-top: 8px; font-size: 15px; color: var(--mute); }
+
+.hero { position: relative; isolation: isolate; padding: 6px 0 20px; min-height: 245px; overflow: hidden; border-radius: 18px; }
+.hero h1 { font-size: clamp(34px, 6vw, 58px); line-height: 1.04; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p.lead { max-width: 60ch; color: var(--mute); margin-top: 12px; font-size: 19px; }
+/* Soft DNA illustration behind the intro text. Inline SVG keeps this game fully offline. */
+.hero-art { position: absolute; inset: 0; z-index: -1; display: block; overflow: hidden; opacity: .22; pointer-events: none; background: radial-gradient(ellipse at 78% 38%, rgba(53,198,217,.16), transparent 58%); }
+.hero-art svg { display: block; position: absolute; width: min(100%, 520px); height: 100%; right: 0; top: 0; }
+.hero > :not(.hero-art) { position: relative; z-index: 1; }
+@media (max-width: 640px) { .hero { min-height: 225px; } .hero-art svg { width: 100%; opacity: .9; } }
+.steps5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 760px) { .steps5 { grid-template-columns: minmax(0, 1fr); } }
+.steps5 div { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+.steps5 b { display: block; font-family: var(--mono); color: var(--accent); font-size: 13px; }
+.go { font-size: 22px; padding: 16px 34px; }
+.cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 640px) { .cases { grid-template-columns: minmax(0, 1fr); } }
+.cases .opt { padding: 9px 12px; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: rgba(53,198,217,.14); }
+.score { font-family: var(--display); font-size: clamp(54px, 10vw, 90px); line-height: 1; color: var(--accent); }
+.seal { display: inline-grid; place-items: center; text-align: center; width: 150px; height: 150px; border-radius: 50%; border: 3px double var(--amber); color: var(--amber); font-family: var(--display); font-weight: 700; font-size: 17px; line-height: 1.15; transform: rotate(-8deg); padding: 10px; }
+table.bd { width: 100%; border-collapse: collapse; font-size: 16px; }
+table.bd td, table.bd th { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+table.bd td:not(:first-child), table.bd th:not(:first-child) { text-align: right; font-family: var(--mono); }
+table.bd th { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function () {
+"use strict";
+var root = document.getElementById("app");
+var LET = ["A", "T", "G", "C"];
+var PL = 3, OMIN = -3, OMAX = 5;
+var ARW = "→";
+
+/* ============ DATA (all simulated) ============ */
+function lcg(seed) { var x = seed; return function () { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; }; }
+function qualHigh(n, seed) { var r = lcg(seed), a = []; for (var i = 0; i < n; i++) a.push(34 + Math.round(r() * 6)); return a; }
+function qualLow(n, seed) { var r = lcg(seed), a = []; for (var i = 0; i < n; i++) a.push(3 + Math.round(r() * 12)); return a; }
+function T(s, c) {
+  return s.replace(/\{pos\}/g, c.pos).replace(/\{from\}/g, c.from).replace(/\{to\}/g, c.to).replace(/\{alt\}/g, c.alt)
+    .replace(/\{drug\}/g, c.drug).replace(/\{org\}/g, c.org).replace(/\{other\}/g, "Bacterium alpha").replace(/\{odrug\}/g, "Drug Z").replace(/\{ARW\}/g, ARW);
+}
+/* One rule decides how strong a piece of evidence is. */
+function rate(a) {
+  if (!a.effect) return "NE";
+  if (a.change === "exact" && a.species === "ours" && a.drug === "ours" && a.tested) return "SUP";
+  return "UNC";
+}
+function whyOf(a) {
+  if (!a.effect) return "It does not say what the change does, so it does not help yet.";
+  if (a.change === "different") return "It is about a different change, not ours. It is only a hint.";
+  if (a.change === "area") return "It is about a whole area, not our exact change. It is only a hint.";
+  if (a.species !== "ours") return "It is about a different bacterium, so it may not apply to ours. It is only a hint.";
+  if (a.drug !== "ours") return "It is about a different drug, so it may not apply to ours. It is only a hint.";
+  if (!a.tested) return "It has not been properly tested or confirmed yet. It is only a hint.";
+  return "It is about our exact change, bacteria and drug, and it was tested. That is strong evidence.";
+}
+var OURS = { effect: true, change: "exact", species: "ours", drug: "ours", tested: true };
+var EV = {
+  obs: { text: "Our sample's DNA differs from the reference at position {pos}: {from} {ARW} {to}.", tells: "The DNA is different here. It does not say what the difference does.", a: { effect: false, change: "exact", species: "ours", drug: "ours", tested: false } },
+  nolib: { text: "The clue library has no entry for position {pos}.", tells: "Nobody has recorded this spot yet. That says nothing about what our change does.", a: { effect: false, change: "none", species: "ours", drug: "ours", tested: false } },
+  near: { text: "The clue library lists a different change at position {pos}: {from} {ARW} {alt}. Ours is {from} {ARW} {to}.", tells: "It is about a different change at the same spot.", a: { effect: true, change: "different", species: "ours", drug: "ours", tested: true } },
+  early: { text: "The clue library lists {from} {ARW} {to} at position {pos}, based on one small early report.", tells: "It is about our exact change, but it comes from one early report that has not been checked again.", a: { effect: true, change: "exact", species: "ours", drug: "ours", tested: false } },
+  area: { text: "Lab note: changes in this area can sometimes affect {drug}, but nobody is sure which changes matter.", tells: "It is about the whole area, not our exact change.", a: { effect: true, change: "area", species: "ours", drug: "ours", tested: false } },
+  species: { text: "Lab note: {from} {ARW} {to} at position {pos} weakened {drug} in a different bacterium, {other}.", tells: "Same change and same drug, but a different bacterium.", a: { effect: true, change: "exact", species: "other", drug: "ours", tested: true } },
+  drug: { text: "Lab note: {from} {ARW} {to} at position {pos} in {org} weakened a different drug, {odrug}.", tells: "Same change and same bacteria, but a different drug.", a: { effect: true, change: "exact", species: "ours", drug: "other", tested: true } },
+  study: { text: "New study, not yet in the clue library: {from} {ARW} {to} at position {pos} was tested in a lab and {drug} stopped working on {org}.", tells: "It is about our exact change, bacteria and drug, and it was tested in a lab. The library has not added it yet.", a: OURS }
+};
+function mkEv(kind, i, c) { var e = EV[kind]; return { id: "E" + (i + 1), kind: kind, text: T(e.text, c), tells: T(e.tells, c), a: e.a, ans: rate(e.a), why: whyOf(e.a) }; }
+
+var CONC = {
+  unknown: [
+    { k: "best", t: "A DNA difference was found, but its effect on resistance is not established.", pts: 2, fb: "Good. This says what we saw and does not claim more than the evidence shows." },
+    { k: "over", t: "Resistance is confirmed.", pts: 0, fb: "Too strong. A DNA difference alone does not show resistance." },
+    { k: "over", t: "The bacteria are confirmed to be susceptible.", pts: 0, fb: "Too strong. Finding nothing known does not prove the bacteria are susceptible." }],
+  match: [
+    { k: "best", t: "The library lists a possible link, but it is not confirmed.", pts: 2, fb: "Good. A library match is a lead worth checking, not proof." },
+    { k: "under", t: "A DNA difference was found, but its effect on resistance is not established.", pts: 1, fb: "True, but incomplete. It leaves out the lead the library gave us." },
+    { k: "over", t: "Resistance is confirmed.", pts: 0, fb: "Too strong. One small early report does not confirm anything." }],
+  study: [
+    { k: "best", t: "The evidence supports a link between this change and resistance. A lab test on this sample would still be needed to show its actual response.", pts: 2, fb: "Good. This uses the strong evidence and still says what a lab test would add." },
+    { k: "under", t: "A DNA difference was found, but its effect on resistance is not established.", pts: 1, fb: "True, but it ignores the strong evidence you judged. The evidence does support a link." },
+    { k: "over", t: "Resistance is confirmed for this sample.", pts: 0, fb: "Too strong. The evidence supports a link, but only a lab test on this sample can show whether it is resistant." }],
+  near: [
+    { k: "best", t: "The library lists a different change at this spot, not ours. Our change's effect is not established.", pts: 2, fb: "Good. A similar-looking finding is not the same finding." },
+    { k: "under", t: "A DNA difference was found, but its effect on resistance is not established.", pts: 1, fb: "True, but incomplete. It leaves out that the library lists a different change here." },
+    { k: "over", t: "The library confirms that our change causes resistance.", pts: 0, fb: "Not true. The library entry is about a different change." }]
+};
+var LIMIT = {
+  unknown: "A DNA difference alone does not show how this bacterium responds to the drug. A lab test measures that under set conditions.",
+  match: "A library match is a lead, not proof. A lab test measures how this bacterium responds to the drug under set conditions.",
+  study: "The evidence supports a link in general. It does not prove this sample is resistant. A lab test on this sample would show its actual response.",
+  near: "A DNA difference alone does not show how this bacterium responds to the drug. A lab test measures that under set conditions."
+};
+var REPLY = {
+  best: "Thank you. That is clear and fair. You told me what you found and how sure we can be.",
+  over: "Are you sure? I cannot change a patient's treatment on a claim the evidence does not back.",
+  under: "That is true, but you left out something useful from the evidence."
+};
+var STOP_OPTS = [
+  { k: "look", t: "Look into the warning first, for example re-run or clean the data", pts: 2, kind: "best", fb: "A warning means the data needs attention. Find out why before trusting any results." },
+  { k: "ignore", t: "Ignore the warning and carry on", pts: 0, kind: "over", fb: "Results from data with unexplained problems can be wrong." },
+  { k: "bin", t: "Delete everything. The data is useless", pts: 0, kind: "over", fb: "A warning does not automatically make data useless. It may be fixable." }
+];
+var STOP_REPLY = { best: "Thank you for looking into the warning first. We will check it before anyone reads anything into the results.", over: "That is risky. Please do not trust results from data that has a problem nobody has checked." };
+
+function mkCase(o) {
+  var d = o.pos - 1, from = o.ref[d], to = o.to;
+  var alt = LET.filter(function (x) { return x !== from && x !== to; })[0];
+  var smp = o.ref.slice(0, d) + to + o.ref.slice(d + 1);
+  var c = { id: o.id, name: o.name, blurb: o.blurb, ref: o.ref, smp: smp, pos: o.pos, from: from, to: to, alt: alt, org: o.org, drug: o.drug, off0: o.off0, warn: false, type: o.type,
+    qc: { q: { label: "Letter confidence", val: "HIGH", warn: false }, x: { label: "Other DNA mixed in", val: "none found", warn: false } }, raw: smp, qual: qualHigh(smp.length, o.seed) };
+  function L(id, pos, t) { return { id: id, pos: pos, from: o.ref[pos - 1], to: t }; }
+  var X = o.lib ? L("X", o.lib[0][0], o.lib[0][1]) : null, Y = o.lib ? L("Y", o.lib[1][0], o.lib[1][1]) : null, Z = o.lib ? L("Z", o.lib[2][0], o.lib[2][1]) : null;
+  var Q = { id: "Q", pos: o.pos, from: from, to: to }, R = { id: "R", pos: o.pos, from: from, to: alt };
+  var kinds;
+  if (o.type === "unknown") { c.lib = [X, Y, Z]; kinds = ["obs", "nolib", o.e3]; }
+  if (o.type === "match") { c.lib = [X, Y, Q]; kinds = ["obs", "early", "area"]; }
+  if (o.type === "study") { c.lib = [X, Y, R]; kinds = ["obs", "near", "study"]; }
+  if (o.type === "near") { c.lib = [X, R, Z]; kinds = ["obs", "near", o.e3]; }
+  c.ev = kinds.map(function (k, i) { return mkEv(k, i, c); });
+  return c;
+}
+function mkMess(o) {
+  var c = mkCase({ id: o.id, name: o.name, blurb: o.blurb, ref: o.ref, pos: o.pos, to: o.to, org: o.org, drug: o.drug, off0: o.off0, seed: o.seed, type: "unknown", e3: "area", lib: [[2, "A"], [9, "G"], [20, "T"]] });
+  c.type = "messy"; c.warn = true; c.lib = []; c.ev = []; o.apply(c); return c;
+}
+var R1 = "ATGGCTCAACCGTTAGGCAATCGA", R2 = "ATGAAACGTCCTGATTCAGGTAAC", R3 = "ATGCGTACCTTGAGCTAAGCTTGA", R4 = "ATGTTCGAACGGCTAATCGTCAGA";
+var D1 = { org: "Bacterium delta", drug: "Drug D" }, D2 = { org: "Bacterium beta", drug: "Drug E" }, D3 = { org: "Bacterium gamma", drug: "Drug F" };
+var CASES = {
+  c1: mkCase({ id: "c1", name: "First sample", blurb: "A clean sample. Nothing is known about this change.", ref: R1, pos: 14, to: "C", lib: [[6, "A"], [19, "G"], [22, "T"]], type: "unknown", e3: "area", org: D1.org, drug: D1.drug, off0: 3, seed: 11 }),
+  rb: mkCase({ id: "rb", name: "A study arrives", blurb: "Strong evidence exists for this change.", ref: R1, pos: 14, to: "C", lib: [[6, "A"], [19, "G"], [22, "T"]], type: "study", org: D1.org, drug: D1.drug, off0: 3, seed: 11 }),
+  c4: mkCase({ id: "c4", name: "A similar change", blurb: "The library knows a different change at this spot.", ref: R3, pos: 9, to: "T", lib: [[3, "T"], [12, "A"], [16, "C"]], type: "near", e3: "drug", org: D3.org, drug: D3.drug, off0: 4, seed: 31 }),
+  c3: mkCase({ id: "c3", name: "Another bacterium", blurb: "Evidence exists, but for a different bacterium.", ref: R2, pos: 20, to: "A", lib: [[4, "G"], [11, "A"], [23, "C"]], type: "unknown", e3: "species", org: D2.org, drug: D2.drug, off0: 2, seed: 23 }),
+  c5: mkCase({ id: "c5", name: "A new sample", blurb: "A new bacterium and drug. Strong evidence exists.", ref: R4, pos: 17, to: "G", lib: [[2, "C"], [10, "A"], [20, "G"]], type: "study", org: D3.org, drug: D3.drug, off0: 3, seed: 47 }),
+  ra: mkCase({ id: "ra", name: "A library match", blurb: "The library lists our change, from one small early report.", ref: R1, pos: 14, to: "C", lib: [[6, "A"], [19, "G"], [22, "T"]], type: "match", org: D1.org, drug: D1.drug, off0: 3, seed: 11 }),
+  c2: mkMess({ id: "c2", name: "Data check practice 1", blurb: "Low letter confidence and mixed-in DNA.", ref: R1, pos: 14, to: "C", org: D1.org, drug: D1.drug, off0: 3, seed: 59,
+    apply: function (c) {
+      c.qc = { q: { label: "Letter confidence", val: "LOW", warn: true }, x: { label: "Other DNA mixed in", val: "31% from another organism", warn: true } };
+      var r = c.smp.split(""); [3, 8, 14, 19].forEach(function (i) { r[i] = "N"; }); c.raw = r.join(""); c.qual = qualLow(24, 59); } }),
+  c2b: mkMess({ id: "c2b", name: "Data check practice 2", blurb: "The read is cut short.", ref: R2, pos: 20, to: "A", org: D2.org, drug: D2.drug, off0: 2, seed: 71,
+    apply: function (c) {
+      c.qc = { q: { label: "Letter confidence", val: "HIGH", warn: false }, x: { label: "Read length", val: "12 of 24 letters", warn: true } };
+      c.raw = c.smp.slice(0, 12); c.qual = qualHigh(12, 71); } })
+};
+var ROT = ["c1", "rb", "c4", "c3", "c5", "ra"];
+var STG = { qc: { n: "Data check" }, align: { n: "Spot the difference" }, scan: { n: "Check the clue library" }, weigh: { n: "Judge the evidence" }, report: { n: "Choose your conclusion" }, stop: { n: "What now?" } };
+var HINT = {
+  qc: "Analyse only if there is no ⚠ symbol. Any ⚠ means look into it first.",
+  align: "Look for the ≠ mark between the two rows. Read the two letters in that column.",
+  scan: "Compare the position first. Then compare the letters.",
+  weigh: "Ask: is it about our exact change, our bacteria and our drug? Was it tested?",
+  report: "Do not claim more than the evidence shows.",
+  stop: "A warning means look into it. It does not mean the data is useless."
+};
+var LEARN = {
+  qc: "Before analysing DNA, scientists check the data is good enough. A machine gives each DNA letter a confidence score. DNA from other organisms can also get mixed in. These are warnings: look into them before trusting the results. Real quality checks look at more than this.",
+  align: "DNA is written with four letters: A, T, G and C. Computers line two sequences up and mark where they differ. Here we use a simplified example. Real alignment can also handle gaps and extra letters.",
+  scan: "A clue library is a list of DNA changes that scientists have already studied. A match is a lead, not proof. No match does not mean the change is harmless. It may just be unstudied. The library can also be out of date: a new study may not be in it yet.",
+  weigh: "In this game, evidence counts as strong only when it is about the same change, the same bacteria and the same drug, and it was tested. Otherwise it is a hint at best. Real scientists also weigh how big and how good a study was, and whether others found the same. DNA can help predict what a bacterium may do. A lab test measures how it responds under set test conditions.",
+  report: "A good report says what we saw, what the evidence supports, and what we still do not know. DNA alone does not establish whether a bacterium resists a drug. A lab susceptibility test measures the response under set conditions.",
+  stop: "A quality warning means the data needs attention. It might be fixable. It does not automatically make the data useless."
+};
+
+/* ============ HELPERS (exported for tests) ============ */
+function diffIdx(c) { for (var i = 0; i < c.ref.length; i++) if (c.ref[i] !== c.smp[i]) return i; return -1; }
+function scanTruth(c) {
+  var d = diffIdx(c), r = c.ref[d], s = c.smp[d], samePos = false;
+  for (var i = 0; i < c.lib.length; i++) {
+    var e = c.lib[i];
+    if (e.pos === d + 1) { samePos = true; if (e.from === r && e.to === s) return "FOUND"; }
+  }
+  return samePos ? "UNCERTAIN" : "NOT FOUND";
+}
+function libEntry(c) { for (var i = 0; i < c.lib.length; i++) if (c.lib[i].pos === c.pos) return c.lib[i]; return null; }
+function conclKey(c) { return c.type; }
+function esc(s) { return String(s).replace(/[&<>"]/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]; }); }
+function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+function fmt(s) { s = Math.round(s); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); }
+
+/* ============ STATE ============ */
+var S;
+function fresh(keep) {
+  return { screen: "intro", caseId: "c1", sel: keep ? keep.sel : "c1", judge: keep ? keep.judge : false, cmOpen: keep ? keep.cmOpen : false, learn: {}, steps: [], idx: 0, pts: {}, d: {}, hint: {}, t0: 0, off: 0, perm: {}, anim: null, tick: null };
+}
+S = fresh(null);
+function C() { return CASES[S.caseId]; }
+function stage() { return S.steps[S.idx]; }
+function maxPts() { return C().warn ? 3 : 10; }
+function total() { var t = 0; for (var k in S.pts) t += S.pts[k]; return t; }
+function stopAnim() { if (S.anim) { clearTimeout(S.anim); S.anim = null; } }
+function setPts(key, v) { if (S.pts[key] === undefined) S.pts[key] = v; }
+function startGame(id) {
+  stopAnim(); if (S.tick) clearInterval(S.tick);
+  S = fresh(S); S.sel = id; S.caseId = id;
+  var c = CASES[id];
+  S.steps = c.warn ? ["qc", "stop"] : ["qc", "align", "scan", "weigh", "report"];
+  S.perm = { scan2: shuffle([0, 1, 2]), report: shuffle([0, 1, 2]), stop: shuffle([0, 1, 2]) };
+  S.d = { qc: { pick: null }, align: { ref: null, smp: null }, scan: { s1: null, s2: null }, weigh: { i: 0, p: {} }, report: { pick: null }, stop: { pick: null } };
+  S.screen = "play"; S.t0 = Date.now(); S.off = 0;
+  S.tick = setInterval(function () { var el = document.getElementById("clock"); if (el) el.textContent = fmt((Date.now() - S.t0) / 1000); }, 1000);
+  render(); window.scrollTo(0, 0);
+}
+function advance() {
+  stopAnim(); S.idx++;
+  if (S.idx >= S.steps.length) { S.screen = "final"; S.endT = Date.now(); if (S.tick) clearInterval(S.tick); S.off = 0; }
+  else S.off = stage() === "align" ? C().off0 : 0;
+  render(); window.scrollTo(0, 0);
+}
+
+/* ============ SHARED PIECES ============ */
+function caseLabel() { var i = ROT.indexOf(S.caseId); return i >= 0 ? "Case " + (i + 1) + " of " + ROT.length : "Practice: " + C().name; }
+function hud() {
+  return '<div class="top"><div class="brand"><b>DNA Detectives</b><span>' + esc(caseLabel()) + '</span></div><div class="hud"><span class="sim">SIMULATED DATA</span><span class="chip"><svg class="clock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 6.8v5.5l3.6 2.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> <span id="clock">' + fmt((Date.now() - S.t0) / 1000) + '</span></span><span class="chip big">' + total() + " / " + maxPts() + ' points</span><button class="link" data-act="home">Exit</button></div></div>';
+}
+function railHTML() {
+  var n = S.steps.length, pct = n > 1 ? S.idx / (n - 1) : 0;
+  var html = '<div class="rail" aria-label="Progress"><div class="rail-line"></div><div class="rail-fill" style="width:calc((100% - 56px) * ' + pct + ')"></div>';
+  html += '<div class="cart" style="left:calc(28px + (100% - 56px) * ' + pct + ')"><span class="cart-lbl">DATA CART</span></div><div class="rail-nodes">';
+  for (var i = 0; i < n; i++) html += '<div class="rn ' + (i < S.idx ? "done" : i === S.idx ? "on" : "") + '"><i>' + (i < S.idx ? "✓" : i + 1) + "</i>" + esc(STG[S.steps[i]].n) + "</div>";
+  return html + "</div></div>";
+}
+function cartSeq(k) {
+  var c = C(), d = diffIdx(c), raw = c.raw, qual = c.qual, isQc = k === "qc" || k === "stop", showHl = k === "weigh" || k === "report" || k === "scan", cells = "";
+  for (var i = 0; i < raw.length; i++) {
+    var low = qual[i] < 20;
+    cells += '<div class="sq' + (showHl && i === d ? " hl" : "") + (low && isQc ? " low" : "") + (raw[i] === "N" ? " n" : "") + '"><b>' + raw[i] + "</b>";
+    cells += isQc ? '<div class="qw"><span class="qb" style="height:' + Math.round(qual[i] / 40 * 28) + 'px"></span></div>' : '<div class="pn">' + (i + 1) + "</div>";
+    cells += "</div>";
+  }
+  var note = isQc ? "The DNA letters read from the sample. Each bar shows how sure the machine was about a letter." + (raw.indexOf("N") >= 0 ? " N means the letter could not be read." : "")
+    : k === "align" ? "Our sample's DNA, " + c.smp.length + " letters long."
+      : "Our sample. The highlighted letter is the one that differs at position " + (d + 1) + ".";
+  return '<div class="card cartcard"><div class="who">Our sample <span class="sim">SIMULATED</span></div><div class="seq">' + cells + "</div><p>" + note + "</p></div>";
+}
+function side(k) {
+  var open = S.judge || S.learn[k];
+  return '<div class="side">' + cartSeq(k) +
+    '<details class="card flat learn" data-k="' + k + '"' + (open ? " open" : "") + "><summary>Learn more</summary><p>" + esc(LEARN[k]) + "</p></details></div>";
+}
+function task(text) { var k = stage(); var h = S.hint[k] ? '<div class="hintline"><b>Hint:</b> ' + esc(HINT[k]) + "</div>" : '<button class="link hintbtn" data-act="hint">Need a hint? (no points lost)</button>'; return '<div class="task"><span class="ico">\u25b6</span><div><b>Your task</b>' + text + h + "</div></div>"; }
+function info(text) { return '<div class="info"><div>' + text + "</div></div>"; }
+function fbBlock(lines) {
+  return '<div class="fb" role="status">' + lines.map(function (l) {
+    return '<div class="l ' + (l.ok ? "ok" : "no") + '"><span class="ic">' + (l.ok ? "✓" : "✗") + "</span><span>" + esc(l.t) + "</span>" + (l.p !== undefined ? '<span class="pt">' + (l.ok ? "+" + l.p : "+0") + "</span>" : "") + "</div>";
+  }).join("") + "</div>";
+}
+function shell(k, title, body) {
+  return hud() + railHTML() + '<div class="stage"><div class="card board"><div><div class="eyebrow">Stage ' + (S.idx + 1) + " of " + S.steps.length + '</div><h2>' + esc(title) + "</h2></div>" + body + "</div>" + side(k) + "</div>";
+}
+function nextBtn(label) { return '<div class="row"><button class="btn" data-act="next">' + esc(label) + "</button></div>"; }
+function optBtn(act, key, t, dsc, cls, dis) {
+  return '<button class="opt ' + (cls || "") + '" ' + (dis ? "disabled" : "") + ' data-act="' + act + '" data-v="' + esc(key) + '"><div class="t">' + esc(t) + "</div>" + (dsc ? '<div class="d">' + esc(dsc) + "</div>" : "") + "</button>";
+}
+
+/* ============ STAGE 1 ============ */
+function qcHTML() {
+  var c = C(), d = S.d.qc, done = d.pick !== null, truth = c.warn ? "attn" : "ok";
+  var rows = [c.qc.q, c.qc.x].map(function (r) {
+    return '<div class="ln"><span>' + esc(r.label) + '</span><span class="v">' + esc(r.val) + ' <span class="badge ' + (r.warn ? "w" : "ok") + '">' + (r.warn ? "⚠ WARNING" : "✓ OK") + "</span></span></div>";
+  }).join("");
+  var body = task("Is this DNA data good enough to analyse? Tap your answer.") +
+    info("Scientists check the DNA data first by using a machine to:<ol style=\"margin:8px 0 0;padding-left:22px\"><li>Give each DNA letter a confidence score.</li><li>Check whether another DNA sample was mixed in.</li></ol>") +
+    '<div class="qc"><div class="hd"><span>Data check report</span><span class="sim">SIMULATED</span></div>' + rows + '<div class="rule">Rule: any ⚠ warning means look into it before trusting the results.</div></div>';
+  var opts = [["ok", "Good enough to analyse", "No warnings"], ["attn", "Needs attention first", "At least one warning"]];
+  body += '<div class="opts pair">' + opts.map(function (o) {
+    var cls = done ? (o[0] === truth ? "ok" : d.pick === o[0] ? "no" : "dim") : "";
+    return optBtn("pick", o[0], o[1], o[2], cls, done);
+  }).join("") + "</div>";
+  if (done) {
+    var ok = d.pick === truth;
+    var why = truth === "ok" ? "There are no warnings, so the data is good enough to analyse." : "A warning means the data needs attention before we trust the results. It does not automatically mean the data is useless.";
+    body += fbBlock([{ ok: ok, t: (ok ? "Correct. " : "Not quite. ") + why, p: 1 }]) + nextBtn(c.warn ? "Next: what now?" : "Next: Spot The Difference");
+  }
+  return shell("qc", "Evaluate the Data", body);
+}
+
+/* ============ STAGE 2 ============ */
+function alignHTML() {
+  var c = C(), d = S.d.align, done = d.ref !== null && d.smp !== null, Ln = c.ref.length, di = diffIdx(c), nums = "", refc = "", smc = "";
+  for (var i = 0; i < Ln; i++) {
+    nums += '<div class="n" style="left:calc(var(--cw) * ' + (PL + i) + ')">' + (i + 1) + "</div>";
+    refc += '<div class="cell ref" style="left:calc(var(--cw) * ' + (PL + i) + ')">' + c.ref[i] + "</div>";
+    smc += '<div class="cell sm" style="left:calc(var(--cw) * ' + i + ')">' + c.smp[i] + "</div>";
+  }
+  var body = task("Line the sequence in the reference DNA with our sample, then find the ≠ mark. Which DNA letters are different? Tap one letter in each row below.") +
+    '<div class="slide-row"><button class="btn small" data-act="lineup" id="lineupbtn"></button><button class="btn ghost small" data-act="nudgeL" id="nl">\u25c0 Move sample left</button><button class="btn ghost small" data-act="nudgeR" id="nr">Move sample right \u25b6</button><span class="status" id="astatus"></span></div>' +
+    '<div class="align" style="--cols:' + (Ln + 8) + ";--len:" + Ln + '"><div class="agrid">' +
+    '<div class="rowlbl">Position <span class="sim">SIMULATED</span></div><div class="arow nums" style="height:20px">' + nums + "</div>" +
+    '<div class="rowlbl">Reference (the known sequence)</div><div class="arow" id="refrow">' + refc + "</div>" +
+    '<div class="rowlbl">Match = or difference ≠</div><div class="arow" id="markrow"></div>' +
+    '<div class="rowlbl">Our sample</div><div class="arow"><div class="strip" id="strip" tabindex="0" role="slider" aria-label="Sample strip position" aria-valuemin="' + OMIN + '" aria-valuemax="' + OMAX + '">' + smc + "</div></div></div></div>" +
+    '<p class="mini-note">This is a simplified demo. Real alignment can also handle gaps and extra letters. You can also drag the sample strip, or use the arrow keys.</p>';
+  function letterRow(label, field, truth) {
+    return '<div><span class="lbl">' + label + '</span><div class="letters">' + LET.map(function (L) {
+      var cls = "";
+      if (d[field] !== null) cls = L === truth ? "ok" : (d[field] === L ? "no" : "");
+      return '<button class="letter ' + cls + '" ' + (d[field] !== null || S.off !== 0 ? "disabled" : "") + ' data-act="letter" data-f="' + field + '" data-v="' + L + '">' + L + "</button>";
+    }).join("") + "</div></div>";
+  }
+  body += '<div class="pair" id="answers">' + letterRow("Reference letter at position " + (di + 1), "ref", c.ref[di]) + letterRow("Sample letter at position " + (di + 1), "smp", c.smp[di]) + "</div>";
+  body += '<p class="mini-note" id="lockmsg"></p>';
+  if (done) {
+    var r = d.ref === c.ref[di], s = d.smp === c.smp[di];
+    body += fbBlock([{ ok: r, t: r ? "Reference letter: " + c.ref[di] + "." : "The reference has " + c.ref[di] + " at position " + (di + 1) + ".", p: 1 }, { ok: s, t: s ? "Sample letter: " + c.smp[di] + "." : "Our sample has " + c.smp[di] + " at position " + (di + 1) + ".", p: 1 },
+      { ok: true, t: "So at position " + (di + 1) + ", " + c.ref[di] + " changed to " + c.smp[di] + ". This is an observation. It does not yet say what the change does." }]) + nextBtn("Next: Check the Clue Library");
+  }
+  return shell("align", "Which DNA letter is different?", body);
+}
+function refreshAlign() {
+  var c = C(), strip = document.getElementById("strip"); if (!strip) return;
+  var di = diffIdx(c), Ln = c.ref.length, row = document.getElementById("markrow"), html = "", nx = 0;
+  strip.style.transform = "translateX(calc(var(--cw) * " + (PL + S.off) + "))";
+  strip.setAttribute("aria-valuenow", S.off);
+  for (var i = 0; i < Ln; i++) {
+    var j = i - S.off;
+    if (j >= 0 && j < Ln) { var same = c.ref[i] === c.smp[j]; if (!same) nx++; html += '<div class="mk' + (same ? "" : " x") + '" style="left:calc(var(--cw) * ' + (PL + i) + ')">' + (same ? "=" : "≠") + "</div>"; }
+  }
+  row.innerHTML = html;
+  var aligned = S.off === 0;
+  var rc = document.querySelectorAll("#refrow .cell"), sc = strip.querySelectorAll(".cell"), nn = document.querySelectorAll(".nums .n");
+  for (var k = 0; k < rc.length; k++) { rc[k].classList.toggle("diff", aligned && k === di); sc[k].classList.toggle("diff", aligned && k === di); nn[k].classList.toggle("hot", aligned && k === di); }
+  var st = document.getElementById("astatus");
+  if (aligned) { st.className = "status good"; st.textContent = "✓ Lined up. " + nx + " difference" + (nx === 1 ? "" : "s") + " (≠)."; }
+  else { st.className = "status"; st.textContent = ""; }
+  var nl = document.getElementById("nl"), nr = document.getElementById("nr"); if (nl) { nl.disabled = !!S.anim || S.off <= OMIN; nr.disabled = !!S.anim || S.off >= OMAX; }
+  var btn = document.getElementById("lineupbtn");
+  if (btn) { btn.textContent = aligned ? "▶ Watch the computer line them up" : "Line them up"; btn.disabled = !!S.anim; }
+  var done = S.d.align.ref !== null && S.d.align.smp !== null;
+  var ans = document.querySelectorAll("#answers .letter");
+  for (var m = 0; m < ans.length; m++) ans[m].disabled = S.d.align[ans[m].getAttribute("data-f")] !== null || !aligned;
+  var lm = document.getElementById("lockmsg"); if (lm) lm.textContent = (!aligned && !done) ? "Line the sequences up first. Press the button above." : "";
+}
+function playAlign() {
+  if (S.anim) return;
+  var c = C();
+  function slide() {
+    if (S.off === 0) { S.anim = null; refreshAlign(); return; }
+    S.off += S.off > 0 ? -1 : 1; refreshAlign();
+    S.anim = setTimeout(slide, 420);
+  }
+  if (S.off === 0) { S.off = c.off0; S.anim = setTimeout(slide, 1100); }
+  else S.anim = setTimeout(slide, 0);
+  refreshAlign();
+}
+function bindStrip() {
+  var strip = document.getElementById("strip"); if (!strip) return;
+  var sx = 0, so = 0, cw = 20, drag = false, Ln = C().ref.length;
+  strip.addEventListener("pointerdown", function (e) { if (S.anim) return; drag = true; sx = e.clientX; so = S.off; cw = strip.getBoundingClientRect().width / Ln; strip.classList.add("drag"); try { strip.setPointerCapture(e.pointerId); } catch (x) {} });
+  strip.addEventListener("pointermove", function (e) { if (!drag) return; var n = Math.max(OMIN, Math.min(OMAX, so + Math.round((e.clientX - sx) / cw))); if (n !== S.off) { S.off = n; refreshAlign(); } });
+  function end() { drag = false; strip.classList.remove("drag"); }
+  strip.addEventListener("pointerup", end); strip.addEventListener("pointercancel", end);
+  strip.addEventListener("keydown", function (e) {
+    if (S.anim) return;
+    if (e.key === "ArrowLeft") { S.off = Math.max(OMIN, S.off - 1); refreshAlign(); e.preventDefault(); }
+    if (e.key === "ArrowRight") { S.off = Math.min(OMAX, S.off + 1); refreshAlign(); e.preventDefault(); }
+  });
+}
+
+/* ============ STAGE 3 ============ */
+var S1 = [["FOUND", "Yes, an exact match", "Same position and same change"], ["UNCERTAIN", "Same place, different change", "Same position, but not the same change"], ["NOT FOUND", "No entry for this place", "Nothing is listed at our position"]];
+function scan2Opts(truth) {
+  if (truth === "FOUND") return [
+    { k: "best", t: "It is a lead worth checking, but it is not proof.", fb: "A match is a clue to follow up. It is not proof of resistance." },
+    { k: "over", t: "It proves the bacteria are resistant.", fb: "Too strong. A library match alone is not proof." },
+    { k: "over", t: "It means nothing. Ignore it.", fb: "Not quite. A match is a useful lead." }];
+  if (truth === "UNCERTAIN") return [
+    { k: "best", t: "It is about a different change, so it does not apply directly.", fb: "Right. A similar-looking finding is not the same finding." },
+    { k: "over", t: "It proves our change causes resistance.", fb: "Not true. The entry is about a different change." },
+    { k: "over", t: "It proves our change is harmless.", fb: "Not true. A different entry says nothing about whether ours is harmless." }];
+  return [
+    { k: "best", t: "Nobody has recorded it yet. But that does not mean it is harmless.", fb: "Right. No match means unstudied, not safe." },
+    { k: "over", t: "The bacteria are safe from the drug.", fb: "Too strong. No match does not mean the bacteria are susceptible." },
+    { k: "over", t: "Our change causes resistance.", fb: "Not true. Nothing in the library says that." }];
+}
+function scanExplain(c, truth) {
+  var e = libEntry(c);
+  if (truth === "FOUND") return "Clue " + e.id + " is at position " + c.pos + " and is the same change (" + c.from + " " + ARW + " " + c.to + ").";
+  if (truth === "UNCERTAIN") return "Clue " + e.id + " is at position " + c.pos + ", but it is " + e.from + " " + ARW + " " + e.to + ". Ours is " + c.from + " " + ARW + " " + c.to + ".";
+  return "No clue is at position " + c.pos + ".";
+}
+function scanHTML() {
+  var c = C(), d = S.d.scan, truth = scanTruth(c), e = libEntry(c), a1 = d.s1 !== null, a2 = d.s2 !== null;
+  var rows = c.lib.map(function (x) {
+    var hit = a1 && e && x.id === e.id;
+    return '<div class="entry' + (hit ? " hit" : "") + '"><span>Clue ' + x.id + ": position " + x.pos + ", " + x.from + " " + ARW + " " + x.to + "</span>" + (hit ? '<span class="tag">' + (truth === "FOUND" ? "← same spot, same change" : "← same spot, different change") + "</span>" : "") + "</div>";
+  }).join("");
+  var body = task(a1 ? "Now: what does this tell us? Tap your answer." : "Compare our change with the clue library. Is there a matching entry? Tap your answer.") +
+    info("A clue library is a list of DNA changes that scientists have already studied. We check our change against it.") +
+    '<div class="ours">Our change: position ' + c.pos + ", " + c.from + " " + ARW + " " + c.to + '</div>' +
+    '<div class="lib"><div class="hd"><span>Clue library</span><span class="sim">SIMULATED</span></div>' + rows + "</div>";
+  body += '<div><span class="lbl">Is there an entry for the same position AND the same change?</span><div class="opts">' + S1.map(function (o) {
+    var cls = a1 ? (o[0] === truth ? "ok" : d.s1 === o[0] ? "no" : "dim") : "";
+    return optBtn("pick1", o[0], o[1], o[2], cls, a1);
+  }).join("") + "</div></div>";
+  if (a1) {
+    var ok1 = d.s1 === truth;
+    body += fbBlock([{ ok: ok1, t: (ok1 ? "Correct. " : "Not quite. ") + scanExplain(c, truth), p: 1 }]);
+    var o2 = scan2Opts(truth);
+    body += '<div><span class="lbl">What does this tell us?</span><div class="opts">' + S.perm.scan2.map(function (i) {
+      var o = o2[i], cls = a2 ? (o.k === "best" ? "ok" : d.s2 === i ? "no" : "dim") : "";
+      return '<button class="opt ' + cls + '" ' + (a2 ? "disabled" : "") + ' data-act="pick2" data-v="' + i + '"><div class="t">' + esc(o.t) + "</div></button>";
+    }).join("") + "</div></div>";
+    if (a2) body += fbBlock([{ ok: o2[d.s2].k === "best", t: o2[d.s2].fb, p: 1 }]) + nextBtn("Next: Judge the Evidence");
+  }
+  return shell("scan", "Is our change in the clue library?", body);
+}
+
+/* ============ STAGE 4 ============ */
+var EVOPTS = [["SUP", "Yes, it supports a link"], ["UNC", "Only a hint"], ["NE", "No, it does not support"]];
+function weighHTML() {
+  var c = C(), d = S.d.weigh, n = c.ev.length, e = c.ev[d.i], picked = d.p[e.id] !== undefined, dots = "";
+  for (var i = 0; i < n; i++) {
+    var id = c.ev[i].id, st = d.p[id] === undefined ? (i === d.i ? "on" : "") : (d.p[id] === c.ev[i].ans ? "dn" : "bd");
+    dots += '<i class="' + st + '"></i>';
+  }
+  var body = task("Does the evidence below support a link between the DNA change and its resistance? Tap your answer.") +
+    '<div class="legend"><div><b>Yes, it supports a link</b>About our exact change, bacteria and drug, and tested.</div><div><b>Only a hint</b>Related, but not exact or not tested.</div><div><b>No, it does not support</b>Does not say what the change does.</div></div>' +
+    '<div class="dots">' + dots + "<span>Evidence " + (d.i + 1) + " of " + n + "</span></div>" +
+    '<div class="clue"><div class="hd"><span>EVIDENCE ' + (d.i + 1) + '</span><span class="sim">SIMULATED</span></div><div class="tx">' + esc(e.text) + '</div><div class="tells"><b>In plain words:</b> ' + esc(e.tells) + "</div></div>";
+  body += '<div class="opts tri">' + EVOPTS.map(function (o) {
+    var cls = picked ? (o[0] === e.ans ? "ok" : d.p[e.id] === o[0] ? "no" : "dim") : "";
+    return optBtn("pickEv", o[0], o[1], "", cls, picked);
+  }).join("") + "</div>";
+  if (picked) {
+    var ok = d.p[e.id] === e.ans, ansLbl = EVOPTS.filter(function (o) { return o[0] === e.ans; })[0][1];
+    body += fbBlock([{ ok: ok, t: (ok ? "Correct. " : "Not quite. The answer is “" + ansLbl + "”. ") + e.why, p: 1 }]) + nextBtn(d.i + 1 < n ? "Next evidence" : "Next: Choose Your Conclusion");
+  }
+  return shell("weigh", "Analyse the evidence strength", body);
+}
+
+/* ============ STAGE 5 ============ */
+function ratingsSummary(c) {
+  var cnt = { SUP: 0, UNC: 0, NE: 0 }, parts = [];
+  c.ev.forEach(function (e) { cnt[e.ans]++; });
+  if (cnt.SUP) parts.push(cnt.SUP + " strong");
+  if (cnt.UNC) parts.push(cnt.UNC + " hint" + (cnt.UNC > 1 ? "s" : ""));
+  if (cnt.NE) parts.push(cnt.NE + " not helpful");
+  return parts.join(", ");
+}
+function reportSheet(chosen) {
+  var c = C(), di = diffIdx(c), truth = scanTruth(c), e = libEntry(c), lib;
+  if (truth === "FOUND") lib = "The library lists the same change (Clue " + e.id + ").";
+  else if (truth === "UNCERTAIN") lib = "The library lists a different change at this position (Clue " + e.id + ").";
+  else lib = "No entry at this position.";
+  return '<div class="sheet"><div class="hd"><h3>Report for Dr. Sofea</h3><span class="sim" style="color:#7a4b00;border-color:#7a4b00">SIMULATED</span></div>' +
+    '<div class="ln"><b>What we saw</b><span>Our sample differs from the reference at position ' + (di + 1) + " (" + c.ref[di] + " " + ARW + " " + c.smp[di] + ").</span></div>" +
+    '<div class="ln"><b>Clue library</b><span>' + esc(lib) + "</span></div>" +
+    '<div class="ln"><b>Evidence</b><span>' + esc(ratingsSummary(c)) + ".</span></div>" +
+    '<div class="ln"><b>Conclusion</b><span>' + esc(chosen.t) + "</span></div>" +
+    '<div class="ln"><b>What we still do not know</b><span>' + esc(LIMIT[c.type]) + "</span></div></div>";
+}
+function reportHTML() {
+  var c = C(), d = S.d.report, opts = CONC[conclKey(c)], done = d.pick !== null;
+  var body = task("What is the most accurate conclusion? Tap your answer.") + info("A good conclusion says what the evidence supports. It never claims more.");
+  body += '<div class="opts">' + S.perm.report.map(function (i) {
+    var o = opts[i], cls = done ? (o.k === "best" ? "ok" : d.pick === i ? "no" : "dim") : "";
+    return '<button class="opt ' + cls + '" ' + (done ? "disabled" : "") + ' data-act="pickConc" data-v="' + i + '"><div class="t">' + esc(o.t) + "</div></button>";
+  }).join("") + "</div>";
+  if (done) {
+    var o = opts[d.pick];
+    body += fbBlock([{ ok: o.k === "best", t: o.fb, p: o.pts }]) + reportSheet(o) +
+      '<div class="reply ' + o.k + '"><div class="who">Dr. Sofea replies</div><q>“' + esc(REPLY[o.k]) + "”</q></div>" + nextBtn("See My Score");
+  }
+  return shell("report", "What is your conclusion?", body);
+}
+function stopHTML() {
+  var d = S.d.stop, done = d.pick !== null;
+  var body = task("The data has a warning. What should a scientist do? Tap your answer.") + info("A warning means the data needs attention. It does not automatically mean the data is useless.");
+  body += '<div class="opts">' + S.perm.stop.map(function (i) {
+    var o = STOP_OPTS[i], cls = done ? (o.k === "look" ? "ok" : d.pick === i ? "no" : "dim") : "";
+    return '<button class="opt ' + cls + '" ' + (done ? "disabled" : "") + ' data-act="pickStop" data-v="' + i + '"><div class="t">' + esc(o.t) + "</div></button>";
+  }).join("") + "</div>";
+  if (done) {
+    var o = STOP_OPTS[d.pick];
+    body += fbBlock([{ ok: o.k === "look", t: o.fb, p: o.pts }]) + '<div class="reply ' + (o.kind === "best" ? "best" : "over") + '"><div class="who">Dr. Sofea replies</div><q>“' + esc(STOP_REPLY[o.kind]) + "”</q></div>" + nextBtn("See My Score");
+  }
+  return shell("stop", "What should a scientist do now?", body);
+}
+
+/* ============ INTRO + FINAL ============ */
+function introHTML() {
+  var html = '<div class="hero"><div class="eyebrow">DNA Detectives · M3P 2026</div><h1>Can a DNA clue prove <em>antibiotic resistance?</em></h1>' +
+    '<p class="lead">Follow one DNA sample through 5 short stages.<br>Compare, check, judge the evidence, and decide what it really shows.</p><div class="mute" style="margin-top:10px;font-size:14px;display:flex;align-items:center;gap:7px"><svg class="clock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 6.8v5.5l3.6 2.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>3–4 minutes</span></div>' +
+    '<div class="hero-art" aria-hidden="true"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="presentation">' +
+    '<defs><linearGradient id="dnaA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#35c6d9"/><stop offset="1" stop-color="#7be7ef"/></linearGradient><linearGradient id="dnaB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3b63f"/><stop offset="1" stop-color="#ffe09a"/></linearGradient></defs>' +
+    '<g fill="none" stroke-linecap="round" stroke-width="4"><path d="M52 16 C150 42 50 62 148 88 S50 132 148 158 S110 180 148 188" stroke="url(#dnaA)"/><path d="M148 16 C50 42 150 62 52 88 S150 132 52 158 S90 180 52 188" stroke="url(#dnaB)"/></g>' +
+    '<g stroke="var(--line)" stroke-width="2.5" stroke-linecap="round"><path d="M70 25 L130 25"/><path d="M57 43 L143 43"/><path d="M58 67 L142 67"/><path d="M75 82 L125 82"/><path d="M69 103 L131 103"/><path d="M56 124 L144 124"/><path d="M57 145 L143 145"/><path d="M72 166 L128 166"/><path d="M83 183 L117 183"/></g>' +
+    '<g fill="var(--accent)"><circle cx="34" cy="42" r="3"/><circle cx="166" cy="61" r="4"/><circle cx="29" cy="137" r="4"/><circle cx="169" cy="155" r="3"/></g><g fill="var(--amber)"><circle cx="167" cy="32" r="2.5"/><circle cx="33" cy="174" r="2.5"/></g>' +
+    '</svg></div></div>';
+  html += '<div class="card" style="margin-bottom:14px"><div class="who">The case</div><p>A hospital read the DNA of bacteria from a patient.</p><p style="margin-top:8px">Dr. Sofea asks: <b>Could anything in this DNA make the bacteria resist an antibiotic?</b></p><p style="margin-top:8px">You are the bioinformatics team responsible to investigate.</p></div>';
+  html += '<div class="steps5" style="margin-bottom:18px"><div><b>1</b>Evaluate the Data</div><div><b>2</b>Spot the Difference</div><div><b>3</b>Check the Clue Library</div><div><b>4</b>Judge the Evidence</div><div><b>5</b>Choose Your Conclusion</div></div>';
+  html += '<div class="row"><button class="btn go" data-act="start">' + (S.sel === "c1" ? "Start" : "Start: " + esc(CASES[S.sel].name)) + '</button><span class="mute" style="font-size:15px">All data in this game is <span class="sim">SIMULATED</span> for teaching. It is not medical advice.</span></div>';
+  html += '<details class="card flat" style="margin-top:22px" id="cm"' + (S.cmOpen ? " open" : "") + '><summary style="cursor:pointer;font-weight:700">Caretaker options</summary><div style="display:grid;gap:12px;margin-top:12px">' +
+    '<div><span class="lbl">Pick a case</span><div class="cases">' + Object.keys(CASES).map(function (id) {
+      var cc = CASES[id], ri = ROT.indexOf(id);
+      return '<button class="opt" data-act="selCase" data-v="' + id + '" aria-pressed="' + (S.sel === id) + '"><div class="t">' + (ri >= 0 ? "Case " + (ri + 1) + ": " : "") + esc(cc.name) + '</div><div class="d">' + esc(cc.blurb) + "</div></button>";
+    }).join("") + '</div></div><div><button class="opt" data-act="toggleJudge" aria-pressed="' + S.judge + '" style="max-width:420px"><div class="t">Judge mode: ' + (S.judge ? "ON" : "OFF") + '</div><div class="d">Opens the "Learn more" science notes on every stage.</div></button></div></div></details>';
+  return html;
+}
+function finalHTML() {
+  var mx = maxPts(), t = total(), th = mx === 3 ? 2 : Math.ceil(mx * 0.8), c = C();
+  var rows = S.steps.map(function (k) {
+    var p, m;
+    if (k === "qc") { p = S.pts.qc || 0; m = 1; }
+    else if (k === "align") { p = (S.pts.al_ref || 0) + (S.pts.al_smp || 0); m = 2; }
+    else if (k === "scan") { p = (S.pts.sc1 || 0) + (S.pts.sc2 || 0); m = 2; }
+    else if (k === "weigh") { p = 0; for (var i = 0; i < 3; i++) p += S.pts["wg" + i] || 0; m = 3; }
+    else if (k === "report") { p = S.pts.rp || 0; m = 2; }
+    else { p = S.pts.stop || 0; m = 2; }
+    return "<tr><td>" + (p === m ? "✓ " : "• ") + esc(STG[k].n) + "</td><td>" + p + " / " + m + "</td></tr>";
+  }).join("");
+  var html = '<div class="top"><div class="brand"><b>DNA Detectives</b><span>' + esc(caseLabel()) + '</span></div><div class="hud"><span class="sim">SIMULATED DATA</span><span class="chip"><svg class="clock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 6.8v5.5l3.6 2.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + fmt((S.endT - S.t0) / 1000) + "</span></div></div>";
+  html += '<div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;gap:24px"><div><div class="eyebrow">Case closed</div><div class="score">' + t + '<span class="mute" style="font-size:.4em"> / ' + mx + '</span></div><p class="mute" style="margin-top:8px;max-width:46ch">' +
+    (t >= th ? "You followed the evidence. Ask at the booth for your sticker." : "Check the ✗ notes, then play another case. The evidence changes the answer.") + "</p></div>" +
+    (t >= th ? '<div class="seal">DNA<br>DETECTIVE</div>' : "") + "</div></div>";
+  html += '<div class="card" style="margin-bottom:14px"><table class="bd"><thead><tr><th>Stage</th><th>Points</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+  html += '<div class="card" style="margin-bottom:14px"><div class="who">What you did</div><p>' + (c.warn ? "You checked the data, saw a warning, and chose what to do next." : "You checked the data, compared DNA, found a difference, checked the clue library, judged the evidence, and made a conclusion.") + "</p><p style=\"margin-top:8px\"><b>Remember:</b> a DNA difference is a clue, not proof. Scientists weigh the evidence before they decide. In this game all data is simulated.</p></div>";
+  html += '<div class="row"><button class="btn" data-act="again">Play another case</button><button class="btn ghost" data-act="replay">Replay this case</button><button class="btn ghost" data-act="home">Back to start</button></div>';
+  return html;
+}
+
+/* ============ RENDER + ACTIONS ============ */
+function render() {
+  if (S.screen === "intro") root.innerHTML = introHTML();
+  else if (S.screen === "final") root.innerHTML = finalHTML();
+  else {
+    var k = stage();
+    root.innerHTML = { qc: qcHTML, align: alignHTML, scan: scanHTML, weigh: weighHTML, report: reportHTML, stop: stopHTML }[k]();
+    if (k === "align") { refreshAlign(); bindStrip(); }
+  }
+}
+var ACT = {
+  start: function () { startGame(S.sel); },
+  selCase: function (d) { S.sel = d.v; S.cmOpen = true; render(); },
+  toggleJudge: function () { S.judge = !S.judge; S.cmOpen = true; render(); },
+  home: function () { stopAnim(); if (S.tick) clearInterval(S.tick); S = fresh(S); render(); },
+  again: function () { var all = ROT.concat(["c2", "c2b"]), i = all.indexOf(S.caseId); startGame(all[(i + 1) % all.length]); },
+  replay: function () { startGame(S.caseId); },
+  hint: function () { S.hint[stage()] = true; render(); },
+  next: function () {
+    if (S.screen !== "play") return;
+    var k = stage(), c = C(), p = S.d[k];
+    if (k === "qc" && p.pick === null) return;
+    if (k === "align" && (p.ref === null || p.smp === null)) return;
+    if (k === "scan" && p.s2 === null) return;
+    if (k === "report" && p.pick === null) return;
+    if (k === "stop" && p.pick === null) return;
+    if (k === "weigh") {
+      if (p.p[c.ev[p.i].id] === undefined) return;
+      if (p.i + 1 < c.ev.length) { p.i++; render(); window.scrollTo(0, 0); return; }
+    }
+    advance();
+  },
+  pick: function (d) { var c = C(), p = S.d.qc; if (p.pick !== null) return; p.pick = d.v; setPts("qc", d.v === (c.warn ? "attn" : "ok") ? 1 : 0); render(); },
+  lineup: function () { playAlign(); },
+  nudgeL: function () { if (!S.anim) { S.off = Math.max(OMIN, S.off - 1); refreshAlign(); } },
+  nudgeR: function () { if (!S.anim) { S.off = Math.min(OMAX, S.off + 1); refreshAlign(); } },
+  letter: function (d) {
+    var c = C(), p = S.d.align, di = diffIdx(c), f = d.f; if (p[f] !== null || S.off !== 0) return;
+    p[f] = d.v; var truth = f === "ref" ? c.ref[di] : c.smp[di];
+    setPts(f === "ref" ? "al_ref" : "al_smp", d.v === truth ? 1 : 0); render();
+  },
+  pick1: function (d) { var c = C(), p = S.d.scan; if (p.s1 !== null) return; p.s1 = d.v; setPts("sc1", d.v === scanTruth(c) ? 1 : 0); render(); },
+  pick2: function (d) {
+    var c = C(), p = S.d.scan; if (p.s1 === null || p.s2 !== null) return;
+    var o = scan2Opts(scanTruth(c))[+d.v]; p.s2 = +d.v; setPts("sc2", o.k === "best" ? 1 : 0); render();
+  },
+  pickEv: function (d) {
+    var c = C(), p = S.d.weigh, e = c.ev[p.i]; if (p.p[e.id] !== undefined) return;
+    p.p[e.id] = d.v; setPts("wg" + p.i, d.v === e.ans ? 1 : 0); render();
+  },
+  pickConc: function (d) { var c = C(), p = S.d.report; if (p.pick !== null) return; p.pick = +d.v; setPts("rp", CONC[conclKey(c)][+d.v].pts); render(); },
+  pickStop: function (d) { var p = S.d.stop; if (p.pick !== null) return; p.pick = +d.v; setPts("stop", STOP_OPTS[+d.v].pts); render(); }
+};
+root.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-act]");
+  if (!b || b.disabled) return;
+  var fn = ACT[b.dataset.act];
+  if (fn) fn(b.dataset);
+});
+root.addEventListener("toggle", function (e) {
+  var t = e.target;
+  if (t && t.classList && t.classList.contains("learn")) S.learn[t.getAttribute("data-k")] = t.open;
+  if (t && t.id === "cm") S.cmOpen = t.open;
+}, true);
+window.DD = { CASES: CASES, ROT: ROT, scanTruth: scanTruth, diffIdx: diffIdx, rate: rate, state: function () { return S; } };
+render();
+})();
+</script>
+
+</body>
+</html>
