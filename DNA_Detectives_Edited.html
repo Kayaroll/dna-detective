@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DNA Detectives</title>
+<link rel="icon" type="image/png" href="favicon.png">
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* Night-shift lab console. Dark single theme (navy surfaces, one cyan accent, amber for DNA differences).
@@ -36,12 +37,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0; }
 .brand b { font-family: var(--display); font-size: 22px; }
 .brand span { font-size: 14px; color: var(--mute); }
-.brand-logo {
-  width: 38px;
-  height: 38px;
-  object-fit: contain;
-  display: block;
-}
 .hud { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .chip { border: 1px solid var(--line); background: var(--bg2); padding: 4px 10px; border-radius: 6px; font-family: var(--mono); font-size: 14px; white-space: nowrap; }
 .clock-icon { width: 16px; height: 16px; display: inline-block; flex: 0 0 16px; vertical-align: -3px; color: var(--accent); }
@@ -406,7 +401,7 @@ function advance() {
 /* ============ SHARED PIECES ============ */
 function caseLabel() { var i = ROT.indexOf(S.caseId); return i >= 0 ? "Case " + (i + 1) + " of " + ROT.length : "Practice: " + C().name; }
 function hud() {
-  return '<div class="top"><div class="brand"><img src="logo.png" alt="DNA Detectives logo" class="brand-logo"><b>DNA Detectives</b><span>' + esc(caseLabel()) + '</span></div><div class="hud"><span class="sim">SIMULATED DATA</span><span class="chip"><svg class="clock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 6.8v5.5l3.6 2.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> <span id="clock">' + fmt((Date.now() - S.t0) / 1000) + '</span></span><span class="chip big">' + total() + " / " + maxPts() + ' points</span><button class="link" data-act="home">Exit</button></div></div>';
+  return '<div class="top"><div class="brand"><b>DNA Detectives</b><span>' + esc(caseLabel()) + '</span></div><div class="hud"><span class="sim">SIMULATED DATA</span><span class="chip"><svg class="clock-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 6.8v5.5l3.6 2.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> <span id="clock">' + fmt((Date.now() - S.t0) / 1000) + '</span></span><span class="chip big">' + total() + " / " + maxPts() + ' points</span><button class="link" data-act="home">Exit</button></div></div>';
 }
 function railHTML() {
   var n = S.steps.length, pct = n > 1 ? S.idx / (n - 1) : 0;
